@@ -6,19 +6,46 @@ export const TRAFFIC_KEEP_AHEAD = 650;
 // Passed cars stay alive far behind so the reverse camera can show them.
 export const TRAFFIC_KEEP_BEHIND = 115;
 export const TRAFFIC_DRAW_AHEAD = 285;
-export const MUSTANG_CHANCE = (2 / 3) * 0.4; // 60% lower than the old two-of-three palette.
-/** BMW M3 Competition: as rare as one Mustang colour. */
-export const BMW_CHANCE = MUSTANG_CHANCE / 2;
-const SPORT = new Set<CarType>(["mustang-blue", "mustang-black", "bmw-m3"]);
+/** The Mustang slot (60% lower than the old two-of-three palette). */
+export const SPORT_SLOT = (2 / 3) * 0.4;
+/** Share of the old Mustang slot now driven by Porsche 911 GT3s (some, not all). */
+export const PORSCHE_SHARE = 0.4;
+export const MUSTANG_CHANCE = SPORT_SLOT * (1 - PORSCHE_SHARE);
+export const PORSCHE_CHANCE = SPORT_SLOT * PORSCHE_SHARE;
+/** BMW M3 Competition: as rare as one colour of the old Mustang slot. */
+export const BMW_CHANCE = SPORT_SLOT / 2;
+/** Bugatti Chiron: the rarest car on the road. */
+export const BUGATTI_CHANCE = BMW_CHANCE / 3;
+const SPORT = new Set<CarType>([
+  "mustang-blue",
+  "mustang-black",
+  "bmw-m3",
+  "porsche-gt3",
+  "bugatti-chiron",
+]);
 export const isSportCar = (t?: CarType) => !!t && SPORT.has(t);
+
+export type SportPush = { gain: number; spread: number; top: number };
+const DEFAULT_PUSH: SportPush = { gain: 40, spread: 55, top: 235 };
+/** How hard each sports car pushes when it decides to race (km/h). */
+export const SPORT_PUSH: Partial<Record<CarType, SportPush>> = {
+  "bugatti-chiron": { gain: 60, spread: 80, top: 300 },
+};
 /**
  * Sports-car mood: alternate calm cruising and pushes (sometimes repeating a
  * phase with a fresh speed and duration) so the rhythm never loops.
  */
-export function nextSportMood(base: number, wasPush: boolean, r1: number, r2: number, r3: number) {
+export function nextSportMood(
+  base: number,
+  wasPush: boolean,
+  r1: number,
+  r2: number,
+  r3: number,
+  p: SportPush = DEFAULT_PUSH,
+) {
   const push = wasPush ? r1 < 0.25 : r1 < 0.7;
   return push
-    ? { push, cruise: Math.min(235, base + 40 + r2 * 55), duration: 2.5 + r3 * 5 }
+    ? { push, cruise: Math.min(p.top, base + p.gain + r2 * p.spread), duration: 2.5 + r3 * 5 }
     : { push, cruise: base * (0.88 + r2 * 0.17), duration: 3.5 + r3 * 7.5 };
 }
 // Width/length in metres, matching the real-scale traffic models.
@@ -33,11 +60,16 @@ export const FOOTPRINTS: Record<CarType, [number, number]> = {
   "mustang-blue": [1.92, 4.8],
   "mustang-black": [1.92, 4.8],
   "bmw-m3": [1.9, 4.8],
+  "porsche-gt3": [1.85, 4.57],
+  "bugatti-chiron": [2.04, 4.54],
 };
 export function pickTrafficType(random: number, normalRandom: number, previous?: CarType): CarType {
   if (!isSportCar(previous)) {
-    if (random < MUSTANG_CHANCE) return normalRandom < 0.5 ? "mustang-blue" : "mustang-black";
-    if (random < MUSTANG_CHANCE + BMW_CHANCE) return "bmw-m3";
+    let edge = MUSTANG_CHANCE;
+    if (random < edge) return normalRandom < 0.5 ? "mustang-blue" : "mustang-black";
+    if (random < (edge += PORSCHE_CHANCE)) return "porsche-gt3";
+    if (random < (edge += BMW_CHANCE)) return "bmw-m3";
+    if (random < (edge += BUGATTI_CHANCE)) return "bugatti-chiron";
   }
   const regular: CarType[] = ["hatch", "sedan", "suv", "pickup", "bus", "truck"];
   return regular[Math.min(regular.length - 1, Math.floor(normalRandom * regular.length))] ?? "hatch";

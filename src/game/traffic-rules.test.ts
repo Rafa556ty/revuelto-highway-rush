@@ -8,11 +8,12 @@ import {
   TRAFFIC_SPAWN_AHEAD,
   TRAFFIC_DRAW_AHEAD,
   FOOTPRINTS,
+  SPORT_SLOT,
 } from "./traffic-rules";
 import { stepAero } from "./aero";
 describe("requested traffic and aero rules", () => {
-  it("reduces the old Mustang probability by 60 percent", () =>
-    expect(MUSTANG_CHANCE).toBeCloseTo((2 / 3) * 0.4));
+  it("keeps the sports slot 60 percent below the old Mustang probability", () =>
+    expect(SPORT_SLOT).toBeCloseTo((2 / 3) * 0.4));
   it("never selects consecutive Mustangs", () =>
     expect(pickTrafficType(0, 0, "mustang-blue")).toBe("hatch"));
   it("selects a white-bus class and all ordinary vehicle types", () => {
@@ -53,11 +54,51 @@ describe("requested traffic and aero rules", () => {
     expect(stepAero({ lift: 1, tilt: 0 }, 0, false, 5).lift).toBeLessThan(0.01));
 });
 
-import { BMW_CHANCE, nextSportMood, isSportCar } from "./traffic-rules";
+import {
+  BMW_CHANCE,
+  PORSCHE_CHANCE,
+  BUGATTI_CHANCE,
+  SPORT_PUSH,
+  nextSportMood,
+  isSportCar,
+} from "./traffic-rules";
+import { stepTrafficWing } from "./aero";
+describe("Porsche GT3 and Bugatti Chiron traffic", () => {
+  it("Porsches replace some Mustangs, but not all", () => {
+    expect(PORSCHE_CHANCE).toBeGreaterThan(0);
+    expect(MUSTANG_CHANCE).toBeGreaterThan(0);
+    expect(MUSTANG_CHANCE + PORSCHE_CHANCE).toBeCloseTo(SPORT_SLOT);
+    expect(pickTrafficType(MUSTANG_CHANCE + PORSCHE_CHANCE / 2, 0)).toBe("porsche-gt3");
+  });
+  it("Bugatti is the rarest car on the road", () => {
+    expect(BUGATTI_CHANCE).toBeGreaterThan(0);
+    expect(BUGATTI_CHANCE).toBeLessThan(Math.min(BMW_CHANCE, PORSCHE_CHANCE, MUSTANG_CHANCE / 2));
+    const edge = MUSTANG_CHANCE + PORSCHE_CHANCE + BMW_CHANCE;
+    expect(pickTrafficType(edge + BUGATTI_CHANCE / 2, 0)).toBe("bugatti-chiron");
+    expect(pickTrafficType(edge + BUGATTI_CHANCE / 2, 0, "porsche-gt3")).toBe("hatch");
+  });
+  it("both use the sports-car calm/push rhythm", () => {
+    expect(isSportCar("porsche-gt3") && isSportCar("bugatti-chiron")).toBe(true);
+    const push = nextSportMood(130, false, 0, 0.5, 0.5, SPORT_PUSH["bugatti-chiron"]);
+    expect(push.push).toBe(true);
+    expect(push.cruise).toBeGreaterThan(130 + 40);
+  });
+  it("Bugatti wing rises gradually while racing and stays low while cruising", () => {
+    const first = stepTrafficWing(0, true, 0.05);
+    expect(first).toBeGreaterThan(0);
+    expect(first).toBeLessThan(0.1);
+    let lift = 0;
+    for (let i = 0; i < 200; i++) lift = stepTrafficWing(lift, true, 0.05);
+    expect(lift).toBeGreaterThan(0.99);
+    expect(stepTrafficWing(0, false, 1)).toBe(0);
+    for (let i = 0; i < 200; i++) lift = stepTrafficWing(lift, false, 0.05);
+    expect(lift).toBeLessThan(0.01);
+  });
+});
 describe("BMW M3 and sports-car rhythm", () => {
-  it("BMW is as rare as one Mustang colour and never follows another sports car", () => {
-    expect(BMW_CHANCE).toBeCloseTo(MUSTANG_CHANCE / 2);
-    expect(pickTrafficType(MUSTANG_CHANCE + BMW_CHANCE / 2, 0)).toBe("bmw-m3");
+  it("BMW is as rare as one colour of the old Mustang slot and never follows another sports car", () => {
+    expect(BMW_CHANCE).toBeCloseTo(SPORT_SLOT / 2);
+    expect(pickTrafficType(MUSTANG_CHANCE + PORSCHE_CHANCE + BMW_CHANCE / 2, 0)).toBe("bmw-m3");
     expect(pickTrafficType(MUSTANG_CHANCE + BMW_CHANCE / 2, 0, "bmw-m3")).toBe("hatch");
     expect(isSportCar("bmw-m3") && isSportCar("mustang-blue") && !isSportCar("sedan")).toBe(true);
   });

@@ -9,6 +9,7 @@ import {
   trafficScreenY,
   isSportCar,
   nextSportMood,
+  SPORT_PUSH,
 } from "./traffic-rules";
 import { pickGear } from "./gearbox";
 import {
@@ -170,6 +171,10 @@ export type RenderCar = {
   hit?: boolean;
   signal: -1 | 1 | 0;
   signalTimer: number;
+  /** km/h; sports cars race in pushes (see nextSportMood) */
+  speed: number;
+  sportPush?: boolean;
+  yieldState?: YieldState;
 };
 
 export type RenderParticle = {
@@ -1139,11 +1144,18 @@ export class RacingEngine {
           t.x += t.vx * dt;
           t.vx *= Math.exp(-3 * dt);
         } else {
-          // 0. Sports cars (Mustang / BMW): alternate calm cruising and pushes
+          // 0. Sports cars (Mustang / BMW / Porsche / Bugatti): alternate calm cruising and pushes
           if (t.sportBase !== undefined && t.yieldState === "idle") {
             t.sportTimer = (t.sportTimer ?? 0) - dt;
             if (t.sportTimer <= 0) {
-              const m = nextSportMood(t.sportBase, !!t.sportPush, Math.random(), Math.random(), Math.random());
+              const m = nextSportMood(
+                t.sportBase,
+                !!t.sportPush,
+                Math.random(),
+                Math.random(),
+                Math.random(),
+                SPORT_PUSH[t.type],
+              );
               t.sportPush = m.push;
               t.sportTimer = m.duration;
               t.originalCruise = m.cruise;
@@ -1321,6 +1333,8 @@ export class RacingEngine {
           { type: "mustang-blue", img: this.images.mustangBlue, minSpeed: 100, maxSpeed: 160 },
           { type: "mustang-black", img: this.images.mustangBlack, minSpeed: 100, maxSpeed: 160 },
           { type: "bmw-m3", img: this.images.mustangBlack, minSpeed: 100, maxSpeed: 150 },
+          { type: "porsche-gt3", img: this.images.mustangBlack, minSpeed: 105, maxSpeed: 160 },
+          { type: "bugatti-chiron", img: this.images.mustangBlue, minSpeed: 110, maxSpeed: 165 },
         ]
       : [
           { type: "sedan", img: this.images.sedan, minSpeed: 85, maxSpeed: 115 },

@@ -14,3 +14,9 @@
 
 - [x] Auto PC/phone layout with manual choice in settings.
 - [x] Moving soft shadow under the Revuelto (sun drift, tunnel lamps, fades at night).
+# Porsche + Bugatti traffic
+
+- [x] Add the uploaded Porsche 911 GT3 Touring and Bugatti Chiron as realistic traffic.
+- [x] Porsches take part of the Mustang share; Bugatti is the rarest car.
+- [x] Both use the calm/push sports-car rhythm and overtake.
+- [x] Bugatti wing rises while racing and stays flush while cruising.

@@ -11,7 +11,13 @@ import type { CarType } from "./traffic";
 import { loadCar, type ModelKey } from "./models3d";
 import { FOOTPRINTS, TRAFFIC_DRAW_AHEAD } from "./traffic-rules";
 import { CAMERA_POSES, nextCameraView, type CameraView } from "./camera-views";
-import { stepAero, type AeroState } from "./aero";
+import {
+  stepAero,
+  stepTrafficWing,
+  TRAFFIC_WING_RISE,
+  TRAFFIC_WING_TILT,
+  type AeroState,
+} from "./aero";
 import { wheelOmega } from "./wheels";
 import { AdaptiveResolution, phoneProfile } from "./quality";
 import {
@@ -45,6 +51,8 @@ const TYPE_MODEL: Record<CarType, TrafficKey> = {
   "mustang-blue": "mustang",
   "mustang-black": "mustang",
   "bmw-m3": "bmw",
+  "porsche-gt3": "porsche",
+  "bugatti-chiron": "bugatti",
   bus: "bus",
   truck: "truck",
   suv: "suv",
@@ -61,6 +69,8 @@ const MODEL_FOOTPRINT: Partial<Record<TrafficKey, [number, number]>> = {
   truck: FOOTPRINTS.truck,
   mustang: FOOTPRINTS["mustang-blue"],
   bmw: FOOTPRINTS["bmw-m3"],
+  porsche: FOOTPRINTS["porsche-gt3"],
+  bugatti: FOOTPRINTS["bugatti-chiron"],
 };
 
 const hash = (n: number) => {
@@ -801,7 +811,18 @@ export class Scene3D {
       return null;
     });
     if (player) this.setupPlayer(player.clone(true));
-    const keys: ModelKey[] = ["hatch", "sedan", "suv", "pickup", "bus", "truck", "mustang", "bmw"];
+    const keys: ModelKey[] = [
+      "hatch",
+      "sedan",
+      "suv",
+      "pickup",
+      "bus",
+      "truck",
+      "mustang",
+      "bmw",
+      "porsche",
+      "bugatti",
+    ];
     await Promise.all(
       keys.map((k) =>
         loadCar(k)
@@ -1054,6 +1075,18 @@ export class Scene3D {
 
   private trafficBatches = new Map<TrafficKey, THREE.InstancedMesh[]>();
   private trafficSignals = new Map<TrafficKey, THREE.InstancedMesh>();
+  /** Moving wing parts per model (Bugatti), drawn with a per-car lift. */
+  private trafficWings = new Map<
+    TrafficKey,
+    { pivot: THREE.Vector3; parts: { mesh: THREE.InstancedMesh; strut: boolean }[] }
+  >();
+  private wingLift = new WeakMap<object, number>();
+  private wingLocal = new THREE.Matrix4();
+  private wingWorld = new THREE.Matrix4();
+  private wingEuler = new THREE.Euler();
+  private wingQuat = new THREE.Quaternion();
+  private wingPos = new THREE.Vector3();
+  private unitScale = new THREE.Vector3(1, 1, 1);
 
   /** Mustang GT interceptor: black-and-white livery, light bar, POLÍCIA doors. */
   private setupPolice(car: THREE.Group) {
@@ -1138,6 +1171,8 @@ export class Scene3D {
 
   private setupTrafficBatch(key: TrafficKey, template: THREE.Group) {
     const parts: THREE.InstancedMesh[] = [];
+    const wingParts: { mesh: THREE.InstancedMesh; strut: boolean }[] = [];
+    let pivot: THREE.Vector3 | null = null;
     template.traverse((object) => {
       if (!(object instanceof THREE.Mesh)) return;
       const materials = Array.isArray(object.material) ? object.material : [object.material];
@@ -1147,8 +1182,12 @@ export class Scene3D {
       mesh.frustumCulled = false;
       mesh.count = 0;
       this.scene.add(mesh);
-      parts.push(mesh);
+      if (object.parent?.name === "active-wing") {
+        pivot = object.parent.position.clone();
+        wingParts.push({ mesh, strut: !!object.userData["strut"] });
+      } else parts.push(mesh);
     });
+    if (pivot && wingParts.length) this.trafficWings.set(key, { pivot, parts: wingParts });
     const [fw, fl] = MODEL_FOOTPRINT[key] ?? [2, 4.6];
     const shadow = new THREE.InstancedMesh(
       new THREE.PlaneGeometry(fw + 0.15, fl + 0.2)
@@ -1343,6 +1382,7 @@ export class Scene3D {
       let count = 0;
       let signalCount = 0;
       const indicators = this.trafficSignals.get(model);
+      const wings = this.trafficWings.get(model);
       for (const car of s.traffic) {
         const z = toZ(car.y);
         if (
@@ -1357,6 +1397,23 @@ export class Scene3D {
         this.scaleVector.set(1, 1, 1);
         this.matrix.compose(this.positionVector, this.quaternion, this.scaleVector);
         for (const part of parts) part.setMatrixAt(count, this.matrix);
+        if (wings) {
+          // Wing up while racing (push / overtake), flush with the tail when cruising.
+          const racing = !car.hit && (!!car.sportPush || car.yieldState === "accelerating");
+          const lift = stepTrafficWing(this.wingLift.get(car) ?? 0, racing, dt);
+          this.wingLift.set(car, lift);
+          for (const { mesh, strut } of wings.parts) {
+            this.wingPos.copy(wings.pivot);
+            this.wingPos.y += lift * TRAFFIC_WING_RISE * (strut ? 0.55 : 1);
+            this.wingEuler.set(strut ? 0 : lift * TRAFFIC_WING_TILT, 0, 0);
+            this.wingQuat.setFromEuler(this.wingEuler);
+            this.wingLocal.compose(this.wingPos, this.wingQuat, this.unitScale);
+            this.wingWorld.multiplyMatrices(this.matrix, this.wingLocal);
+            mesh.setMatrixAt(count, this.wingWorld);
+          }
+          if (import.meta.env.DEV && count === 0)
+            this.canvas.dataset["bugattiWing"] = lift.toFixed(3);
+        }
         if (indicators && car.signal !== 0 && Math.floor(car.signalTimer * 2.6) % 2 === 0) {
           const [cw, cl] = FOOTPRINTS[car.type];
           this.positionVector.set(
@@ -1369,7 +1426,7 @@ export class Scene3D {
         }
         count++;
       }
-      for (const part of parts) {
+      for (const part of wings ? [...parts, ...wings.parts.map((w) => w.mesh)] : parts) {
         part.count = count;
         part.visible = count > 0;
         part.instanceMatrix.needsUpdate = true;

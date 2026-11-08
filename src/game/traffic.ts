@@ -10,7 +10,9 @@ export type CarType =
   | "m5"
   | "mustang-blue"
   | "mustang-black"
-  | "bmw-m3";
+  | "bmw-m3"
+  | "porsche-gt3"
+  | "bugatti-chiron";
 
 export type YieldState = "idle" | "accelerating" | "changing";
 

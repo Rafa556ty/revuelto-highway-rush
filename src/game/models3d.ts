@@ -16,7 +16,7 @@ import mustangAsset from "@/assets/models/mustang-gt-traffic.glb.asset.json";
 import bmwAsset from "@/assets/models/bmw-m4-traffic.glb.asset.json";
 
 export type TrafficModelKey = "hatch" | "sedan" | "suv" | "pickup" | "bus" | "truck";
-export type ModelKey = "revuelto" | "mustang" | "bmw" | TrafficModelKey;
+export type ModelKey = "revuelto" | "mustang" | "bmw" | "porsche" | "bugatti" | TrafficModelKey;
 
 type ModelSpec = {
   url: string;
@@ -30,6 +30,9 @@ export const MODEL_SPECS: Record<ModelKey, ModelSpec> = {
   revuelto: { url: revueltoAsset.url, length: 4.95, yaw: 0 },
   mustang: { url: mustangAsset.url, length: 4.8, yaw: 0 },
   bmw: { url: bmwAsset.url, length: 4.8, yaw: 0 },
+  // User-supplied models, simplified + meshopt for traffic; both noses point +Z.
+  porsche: { url: "/game-assets/porsche-gt3-traffic.glb", length: 4.57, yaw: Math.PI },
+  bugatti: { url: "/game-assets/bugatti-chiron-traffic.glb", length: 4.54, yaw: Math.PI },
   hatch: { url: "/game-assets/traffic-hatch.glb", length: 4.1, yaw: Math.PI },
   sedan: { url: "/game-assets/traffic-sedan.glb", length: 4.7, yaw: Math.PI },
   suv: { url: "/game-assets/traffic-suv.glb", length: 4.65, yaw: Math.PI },
@@ -490,6 +493,46 @@ function batchCar(root: THREE.Group, keep?: (o: THREE.Mesh) => boolean): THREE.G
   return result.children.length ? result : root;
 }
 
+/**
+ * The Chiron's rear wing (materials prefixed "Wing_" by the optimiser) is
+ * batched on its own and parented to an "active-wing" group whose origin is
+ * the wing's leading bottom edge, so the renderer can raise and tilt it.
+ */
+function splitBugattiWing(grounded: THREE.Group): THREE.Group {
+  grounded.updateMatrixWorld(true);
+  const sources: THREE.Mesh[] = [];
+  grounded.traverse((o) => {
+    if (o instanceof THREE.Mesh && !Array.isArray(o.material) && o.material.name.startsWith("Wing_"))
+      sources.push(o);
+  });
+  const loose = new THREE.Group();
+  for (const o of sources) {
+    const material = o.material as THREE.Material;
+    const copy = new THREE.Mesh(o.geometry, material);
+    copy.name = material.name;
+    o.matrixWorld.decompose(copy.position, copy.quaternion, copy.scale);
+    loose.add(copy);
+    o.removeFromParent();
+  }
+  const body = batchCar(grounded);
+  if (!sources.length) return body;
+  const panel = batchCar(loose);
+  const box = new THREE.Box3().setFromObject(panel);
+  const pivot = new THREE.Vector3(0, box.min.y, box.min.z);
+  const wing = new THREE.Group();
+  wing.name = "active-wing";
+  wing.position.copy(pivot);
+  for (const child of [...panel.children]) {
+    const mesh = child as THREE.Mesh;
+    mesh.geometry.translate(-pivot.x, -pivot.y, -pivot.z);
+    // The black hydraulic block under the panel telescopes instead of tilting.
+    mesh.userData["strut"] = /exhaust/i.test((mesh.material as THREE.Material).name);
+    wing.add(mesh);
+  }
+  body.add(wing);
+  return body;
+}
+
 /** Normalised, shared template for one car model (clone it per instance). */
 export function loadCar(key: ModelKey): Promise<THREE.Group> {
   let p = cache.get(key);
@@ -536,6 +579,7 @@ export function loadCar(key: ModelKey): Promise<THREE.Group> {
             m.frustumCulled = true;
           }
         });
+        if (key === "bugatti") return splitBugattiWing(normalizeCar(scene, spec));
         // Revuelto wheels (tyre, rim, rotor, logo) stay unmerged so they can
         // spin; the caliper is bolted to the upright and does not turn.
         const result = batchCar(
