@@ -53,6 +53,7 @@ const TYPE_MODEL: Record<CarType, TrafficKey> = {
   "bmw-m3": "bmw",
   "porsche-gt3": "porsche",
   "bugatti-chiron": "bugatti",
+  "ferrari-sf90": "ferrari",
   bus: "bus",
   truck: "truck",
   suv: "suv",
@@ -71,6 +72,7 @@ const MODEL_FOOTPRINT: Partial<Record<TrafficKey, [number, number]>> = {
   bmw: FOOTPRINTS["bmw-m3"],
   porsche: FOOTPRINTS["porsche-gt3"],
   bugatti: FOOTPRINTS["bugatti-chiron"],
+  ferrari: FOOTPRINTS["ferrari-sf90"],
 };
 
 const hash = (n: number) => {
@@ -822,6 +824,7 @@ export class Scene3D {
       "bmw",
       "porsche",
       "bugatti",
+      "ferrari",
     ];
     await Promise.all(
       keys.map((k) =>

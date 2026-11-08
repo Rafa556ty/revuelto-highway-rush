@@ -12,7 +12,8 @@ export type CarType =
   | "mustang-black"
   | "bmw-m3"
   | "porsche-gt3"
-  | "bugatti-chiron";
+  | "bugatti-chiron"
+  | "ferrari-sf90";
 
 export type YieldState = "idle" | "accelerating" | "changing";
 

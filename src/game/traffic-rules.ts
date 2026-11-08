@@ -16,12 +16,15 @@ export const PORSCHE_CHANCE = SPORT_SLOT * PORSCHE_SHARE;
 export const BMW_CHANCE = SPORT_SLOT / 2;
 /** Bugatti Chiron: the rarest car on the road. */
 export const BUGATTI_CHANCE = BMW_CHANCE / 3;
+/** Ferrari SF90 Stradale: rare, but more common than the Bugatti. */
+export const FERRARI_CHANCE = BMW_CHANCE / 2;
 const SPORT = new Set<CarType>([
   "mustang-blue",
   "mustang-black",
   "bmw-m3",
   "porsche-gt3",
   "bugatti-chiron",
+  "ferrari-sf90",
 ]);
 export const isSportCar = (t?: CarType) => !!t && SPORT.has(t);
 
@@ -30,6 +33,7 @@ const DEFAULT_PUSH: SportPush = { gain: 40, spread: 55, top: 235 };
 /** How hard each sports car pushes when it decides to race (km/h). */
 export const SPORT_PUSH: Partial<Record<CarType, SportPush>> = {
   "bugatti-chiron": { gain: 60, spread: 80, top: 300 },
+  "ferrari-sf90": { gain: 55, spread: 70, top: 290 },
 };
 /**
  * Sports-car mood: alternate calm cruising and pushes (sometimes repeating a
@@ -62,6 +66,7 @@ export const FOOTPRINTS: Record<CarType, [number, number]> = {
   "bmw-m3": [1.9, 4.8],
   "porsche-gt3": [1.85, 4.57],
   "bugatti-chiron": [2.04, 4.54],
+  "ferrari-sf90": [1.97, 4.71],
 };
 export function pickTrafficType(random: number, normalRandom: number, previous?: CarType): CarType {
   if (!isSportCar(previous)) {
@@ -70,6 +75,7 @@ export function pickTrafficType(random: number, normalRandom: number, previous?:
     if (random < (edge += PORSCHE_CHANCE)) return "porsche-gt3";
     if (random < (edge += BMW_CHANCE)) return "bmw-m3";
     if (random < (edge += BUGATTI_CHANCE)) return "bugatti-chiron";
+    if (random < (edge += FERRARI_CHANCE)) return "ferrari-sf90";
   }
   const regular: CarType[] = ["hatch", "sedan", "suv", "pickup", "bus", "truck"];
   return regular[Math.min(regular.length - 1, Math.floor(normalRandom * regular.length))] ?? "hatch";

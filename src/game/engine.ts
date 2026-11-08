@@ -523,6 +523,7 @@ export class RacingEngine {
     this.audio?.stopHorn();
     this.audio?.setPolice(999, false);
     this.audio?.setBoost(false);
+    this.audio?.updateSf90([]);
   }
 
   // ---------- simulation ----------
@@ -530,6 +531,7 @@ export class RacingEngine {
     if (this.paused) {
       this.audio?.setEngine(0, false, false);
       this.audio?.setPolice(999, false);
+      this.audio?.updateSf90([]);
       this.audio?.setTireScreech(0);
       return;
     }
@@ -713,6 +715,19 @@ export class RacingEngine {
       this.spawn();
       this.checkCollision();
     }
+    // Ferrari SF90 traffic: report nearby cars so audio can play the real pull.
+    this.audio?.updateSf90(
+      this.phase === "playing"
+        ? this.traffic
+            .filter((t) => t.type === "ferrari-sf90" && !t.hit)
+            .map((t) => ({
+              key: t,
+              dz: t.z - this.pz,
+              dx: (t.x - p.x) / this.k,
+              racing: !!t.sportPush || t.yieldState === "accelerating",
+            }))
+        : [],
+    );
 
     // Police Pursuit Update
     if (this.mode === "police" && (this.phase === "playing" || this.phase === "busted")) {
@@ -1335,6 +1350,7 @@ export class RacingEngine {
           { type: "bmw-m3", img: this.images.mustangBlack, minSpeed: 100, maxSpeed: 150 },
           { type: "porsche-gt3", img: this.images.mustangBlack, minSpeed: 105, maxSpeed: 160 },
           { type: "bugatti-chiron", img: this.images.mustangBlue, minSpeed: 110, maxSpeed: 165 },
+          { type: "ferrari-sf90", img: this.images.mustangBlack, minSpeed: 108, maxSpeed: 162 },
         ]
       : [
           { type: "sedan", img: this.images.sedan, minSpeed: 85, maxSpeed: 115 },

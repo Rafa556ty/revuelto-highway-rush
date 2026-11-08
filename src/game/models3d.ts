@@ -16,7 +16,14 @@ import mustangAsset from "@/assets/models/mustang-gt-traffic.glb.asset.json";
 import bmwAsset from "@/assets/models/bmw-m4-traffic.glb.asset.json";
 
 export type TrafficModelKey = "hatch" | "sedan" | "suv" | "pickup" | "bus" | "truck";
-export type ModelKey = "revuelto" | "mustang" | "bmw" | "porsche" | "bugatti" | TrafficModelKey;
+export type ModelKey =
+  | "revuelto"
+  | "mustang"
+  | "bmw"
+  | "porsche"
+  | "bugatti"
+  | "ferrari"
+  | TrafficModelKey;
 
 type ModelSpec = {
   url: string;
@@ -33,6 +40,7 @@ export const MODEL_SPECS: Record<ModelKey, ModelSpec> = {
   // User-supplied models, simplified + meshopt for traffic; both noses point +Z.
   porsche: { url: "/game-assets/porsche-gt3-traffic.glb", length: 4.57, yaw: Math.PI },
   bugatti: { url: "/game-assets/bugatti-chiron-traffic.glb", length: 4.54, yaw: Math.PI },
+  ferrari: { url: "/game-assets/ferrari-sf90-traffic.glb", length: 4.71, yaw: Math.PI },
   hatch: { url: "/game-assets/traffic-hatch.glb", length: 4.1, yaw: Math.PI },
   sedan: { url: "/game-assets/traffic-sedan.glb", length: 4.7, yaw: Math.PI },
   suv: { url: "/game-assets/traffic-suv.glb", length: 4.65, yaw: Math.PI },
