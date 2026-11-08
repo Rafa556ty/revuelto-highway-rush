@@ -738,9 +738,28 @@ export function RacingGame() {
 
         {/* Main Menu Screen (Requirements 6, 7, 10, 11) */}
         {phase === "menu" && (
-          <div className="absolute inset-0 z-30 flex flex-col justify-between overflow-y-auto">
+          <div
+            className={cn(
+              "absolute inset-0 z-30 flex flex-col overflow-y-auto",
+              // PC: the wide, bright road shows through the middle of the screen,
+              // so dim the whole view and gather the menu into one solid panel.
+              isPc ? "bg-scrim backdrop-blur-[3px]" : "justify-between",
+            )}
+          >
+            <div
+              className={cn(
+                isPc ? "m-auto flex w-full max-w-md flex-col gap-3 px-4 py-6" : "contents",
+              )}
+            >
             {/* Header / Brand */}
-            <div className="animate-rise-in bg-scrim-top px-6 pb-6 pt-[max(env(safe-area-inset-top),24px)] text-center">
+            <div
+              className={cn(
+                "animate-rise-in px-6 text-center",
+                isPc
+                  ? "pb-2 pt-2 drop-shadow-[0_2px_8px_var(--color-background)]"
+                  : "bg-scrim-top pb-6 pt-[max(env(safe-area-inset-top),24px)]",
+              )}
+            >
               <div className="mx-auto mb-2 flex items-center justify-center gap-2">
                 <span className="rounded bg-primary/20 px-2 py-0.5 text-[11px] font-bold tracking-widest text-primary border border-primary/30">
                   {t.demoBadge}
@@ -769,7 +788,14 @@ export function RacingGame() {
             </div>
 
             {/* Menu Options & Mode Selector */}
-            <div className="animate-rise-in flex flex-col items-center gap-4 bg-scrim-bottom px-6 pb-[max(env(safe-area-inset-bottom),24px)] pt-6 text-center">
+            <div
+              className={cn(
+                "animate-rise-in flex flex-col items-center gap-4 px-6 text-center",
+                isPc
+                  ? "corner-cut border border-hud-border bg-hud py-6 shadow-lg backdrop-blur-md"
+                  : "bg-scrim-bottom pb-[max(env(safe-area-inset-bottom),24px)] pt-6",
+              )}
+            >
               {/* Game Mode Selector (Requirement 6: Police Escape mode) */}
               <div className="w-full max-w-xs space-y-1.5">
                 <p className="text-[11px] font-bold tracking-widest text-muted-foreground uppercase">
@@ -874,6 +900,7 @@ export function RacingGame() {
                   {t.record}: {formatKm(bestScore)} km
                 </p>
               )}
+            </div>
             </div>
           </div>
         )}
