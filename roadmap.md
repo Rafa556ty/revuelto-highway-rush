@@ -20,3 +20,9 @@
 - [x] Porsches take part of the Mustang share; Bugatti is the rarest car.
 - [x] Both use the calm/push sports-car rhythm and overtake.
 - [x] Bugatti wing rises while racing and stays flush while cruising.
+
+# Ferrari SF90 traffic
+
+- [x] Add the uploaded Ferrari SF90 Stradale as realistic traffic, more frequent than the Bugatti.
+- [x] Same calm/push sports-car rhythm with overtakes.
+- [ ] Real SF90 acceleration sound — paused by the user ("esquece som por enquanto").

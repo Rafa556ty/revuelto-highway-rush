@@ -95,6 +95,21 @@ describe("Porsche GT3 and Bugatti Chiron traffic", () => {
     expect(lift).toBeLessThan(0.01);
   });
 });
+import { FERRARI_CHANCE } from "./traffic-rules";
+describe("Ferrari SF90 traffic", () => {
+  it("Ferrari is more frequent than the Bugatti but still a rare sports car", () => {
+    expect(FERRARI_CHANCE).toBeGreaterThan(BUGATTI_CHANCE);
+    expect(FERRARI_CHANCE).toBeLessThan(BMW_CHANCE);
+    const edge = MUSTANG_CHANCE + PORSCHE_CHANCE + BMW_CHANCE + BUGATTI_CHANCE;
+    expect(pickTrafficType(edge + FERRARI_CHANCE / 2, 0)).toBe("ferrari-sf90");
+    expect(pickTrafficType(edge + FERRARI_CHANCE / 2, 0, "bugatti-chiron")).toBe("hatch");
+  });
+  it("uses the same calm/push rhythm and real SF90 size", () => {
+    expect(isSportCar("ferrari-sf90")).toBe(true);
+    expect(nextSportMood(130, false, 0, 0.5, 0.5, SPORT_PUSH["ferrari-sf90"]).push).toBe(true);
+    expect(FOOTPRINTS["ferrari-sf90"]).toEqual([1.97, 4.71]);
+  });
+});
 describe("BMW M3 and sports-car rhythm", () => {
   it("BMW is as rare as one colour of the old Mustang slot and never follows another sports car", () => {
     expect(BMW_CHANCE).toBeCloseTo(SPORT_SLOT / 2);

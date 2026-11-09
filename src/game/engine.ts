@@ -523,7 +523,6 @@ export class RacingEngine {
     this.audio?.stopHorn();
     this.audio?.setPolice(999, false);
     this.audio?.setBoost(false);
-    this.audio?.updateSf90([]);
   }
 
   // ---------- simulation ----------
@@ -531,7 +530,6 @@ export class RacingEngine {
     if (this.paused) {
       this.audio?.setEngine(0, false, false);
       this.audio?.setPolice(999, false);
-      this.audio?.updateSf90([]);
       this.audio?.setTireScreech(0);
       return;
     }
@@ -715,19 +713,6 @@ export class RacingEngine {
       this.spawn();
       this.checkCollision();
     }
-    // Ferrari SF90 traffic: report nearby cars so audio can play the real pull.
-    this.audio?.updateSf90(
-      this.phase === "playing"
-        ? this.traffic
-            .filter((t) => t.type === "ferrari-sf90" && !t.hit)
-            .map((t) => ({
-              key: t,
-              dz: t.z - this.pz,
-              dx: (t.x - p.x) / this.k,
-              racing: !!t.sportPush || t.yieldState === "accelerating",
-            }))
-        : [],
-    );
 
     // Police Pursuit Update
     if (this.mode === "police" && (this.phase === "playing" || this.phase === "busted")) {

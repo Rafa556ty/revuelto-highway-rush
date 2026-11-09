@@ -11,22 +11,8 @@
 import { GEAR_TOP, GEARS, IDLE_RPM, REDLINE, pickGear } from "./gearbox";
 import idleWav from "@/assets/sounds/revuelto-idle.wav.asset.json";
 import revWav from "@/assets/sounds/revuelto-rev.wav.asset.json";
-import { sf90Level, sf90Pan, shouldStartSf90, type Sf90Report } from "./traffic-sound";
 
 const MASTER = 0.82;
-/** Real Ferrari SF90 acceleration recordings (CC BY 3.0, see CREDITS.md). */
-const SF90_CLIPS = ["/game-assets/sf90-accel-1.mp3", "/game-assets/sf90-accel-2.mp3"];
-/** Loudness of a traffic Ferrari right beside the player (player engine peaks near 0.9). */
-const SF90_MIX = 0.55;
-
-type Sf90Voice = {
-  src: AudioBufferSourceNode;
-  gain: GainNode;
-  pan: StereoPannerNode;
-  lp: BiquadFilterNode;
-  end: number;
-  fading: boolean;
-};
 
 const clamp = (v: number, a: number, b: number) => Math.max(a, Math.min(b, v));
 const rnd = (a: number, b: number) => a + Math.random() * (b - a);
@@ -117,12 +103,6 @@ export class GameAudio {
   private tunnelSend: GainNode | null = null;
   private sirenDistLP: BiquadFilterNode | null = null;
   private lastGap = 999;
-
-  // Traffic Ferrari SF90: real acceleration recordings, one voice per car
-  private sf90Bufs: AudioBuffer[] = [];
-  private sf90Voices = new Map<object, Sf90Voice>();
-  private sf90Racing = new WeakMap<object, boolean>();
-  private sf90Clip = 0;
 
   unlock() {
     if (typeof window === "undefined") return;
@@ -296,12 +276,6 @@ export class GameAudio {
       throw new Error(`Failed to load audio from: ${urls.join(", ")}`);
     };
 
-    void Promise.all(SF90_CLIPS.map((u) => get([u])))
-      .then((bufs) => {
-        if (this.ctx === ctx) this.sf90Bufs = bufs;
-      })
-      .catch((err) => console.warn("Ferrari SF90 audio load notice:", err));
-
     try {
       const [idle, rev, forza, topGear, skid] = await Promise.all([
         get([idleWav.url, "/game-assets/revuelto-idle.wav"]),
@@ -412,83 +386,6 @@ export class GameAudio {
     }
     void this.ctx?.close();
     this.ctx = null;
-  }
-
-  /**
-   * Traffic Ferraris near the player. When one starts racing (push or
-   * overtake) its real SF90 pull plays from its side, louder when closer,
-   * and fades when it calms down or drives out of earshot.
-   */
-  updateSf90(reports: readonly Sf90Report[]) {
-    const ctx = this.ctx;
-    if (!ctx || !this.master) return;
-    const t = ctx.currentTime;
-    const seen = new Set<object>();
-    for (const r of reports) {
-      seen.add(r.key);
-      const was = this.sf90Racing.get(r.key) ?? false;
-      this.sf90Racing.set(r.key, r.racing);
-      let v = this.sf90Voices.get(r.key);
-      // Still pulling when the clip runs out: chain the next recording.
-      if (v && !v.fading && r.racing && t > v.end - 0.4) {
-        this.fadeSf90(v, t, 0.25);
-        this.sf90Voices.delete(r.key);
-        v = this.startSf90(ctx, t) ?? undefined;
-        if (v) this.sf90Voices.set(r.key, v);
-      }
-      if (
-        !v &&
-        this.sf90Bufs.length &&
-        shouldStartSf90(was, r.racing, r.dz, r.dx, false, this.sf90Voices.size)
-      ) {
-        v = this.startSf90(ctx, t) ?? undefined;
-        if (v) this.sf90Voices.set(r.key, v);
-      }
-      if (!v) continue;
-      if (!r.racing && !v.fading) this.fadeSf90(v, t, 0.6);
-      if (v.fading) continue;
-      const level = sf90Level(r.dz, r.dx);
-      v.gain.gain.setTargetAtTime(SF90_MIX * level, t, 0.08);
-      v.pan.pan.setTargetAtTime(sf90Pan(r.dz, r.dx), t, 0.08);
-      // Distant cars lose their highs, like the police siren.
-      v.lp.frequency.setTargetAtTime(1400 + 10000 * level, t, 0.1);
-    }
-    for (const [key, v] of this.sf90Voices) {
-      if (!seen.has(key) && !v.fading) this.fadeSf90(v, t, 0.4);
-      if (t > v.end) this.sf90Voices.delete(key);
-    }
-  }
-
-  private startSf90(ctx: AudioContext, t: number): Sf90Voice | null {
-    const buf = this.sf90Bufs[this.sf90Clip++ % this.sf90Bufs.length];
-    if (!buf || !this.master) return null;
-    const src = ctx.createBufferSource();
-    src.buffer = buf;
-    const lp = ctx.createBiquadFilter();
-    lp.type = "lowpass";
-    lp.frequency.value = 6000;
-    const gain = ctx.createGain();
-    gain.gain.value = 0;
-    const pan = ctx.createStereoPanner();
-    src.connect(lp);
-    lp.connect(gain);
-    gain.connect(pan);
-    pan.connect(this.master);
-    src.start(t);
-    return { src, gain, pan, lp, end: t + buf.duration, fading: false };
-  }
-
-  private fadeSf90(v: Sf90Voice, t: number, seconds: number) {
-    v.fading = true;
-    v.gain.gain.cancelScheduledValues(t);
-    v.gain.gain.setTargetAtTime(0, t, seconds / 3);
-    const stopAt = Math.min(v.end, t + seconds + 0.1);
-    try {
-      v.src.stop(stopAt);
-    } catch {
-      // already stopped
-    }
-    v.end = stopAt;
   }
 
   setMuted(m: boolean) {
